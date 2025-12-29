@@ -8,30 +8,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Clonar repositorio
-      uses: actions/checkout@v4
+      - name: Clonar repo
+        uses: actions/checkout@v4
 
-    - name: Configurar Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Instalar dependencias
-      run: |
-        pip install -r requirements.txt
+      - name: Instalar dependencias
+        run: |
+          pip install pandas requests
 
-- name: Instalar dependencias
-  run: |
-    python -m pip install --upgrade pip
-    pip install requests
+      - name: Ejecutar carga histórica
+        run: |
+          python scripts/cargar_historico.py
 
-- name: Cargar histórico
-  run: python scripts/cargar_historico.py
-
-    - name: Guardar cambios en CSV
-      run: |
-        git config user.name "github-actions"
-        git config user.email "actions@github.com"
-        git add data/tris.csv
-        git commit -m "Carga inicial histórico TRIS" || echo "Sin cambios"
-        git push
+      - name: Guardar cambios
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/tris.csv
+          git commit -m "Carga automática histórico TRIS" || echo "Sin cambios"
+          git push
