@@ -1,35 +1,28 @@
-name: Cargar histórico TRIS
+import requests
+import pandas as pd
+from bs4 import BeautifulSoup
+from io import StringIO
 
-on:
-  workflow_dispatch:
+URL = "https://www.loterianacional.gob.mx/Tris/resultados"
 
-jobs:
-  cargar:
-    runs-on: ubuntu-latest
+def main():
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
 
-    steps:
-      - name: Clonar repo
-        uses: actions/checkout@v4
+    response = requests.get(URL, headers=headers, timeout=30)
+    response.raise_for_status()
 
-      - name: Configurar Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+    soup = BeautifulSoup(response.text, "html.parser")
 
-      - name: Instalar dependencias
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install lxml html5lib beautifulsoup4
+    table = soup.find("table")
+    if table is None:
+        raise Exception("No se encontró la tabla de resultados")
 
-      - name: Ejecutar carga histórica
-        run: |
-          python scripts/cargar_historico.py
+    df = pd.read_html(StringIO(str(table)))[0]
 
-      - name: Guardar cambios
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add data/tris.csv
-          git commit -m "Carga automática histórico TRIS" || echo "Sin cambios"
-          git push
+    df.to_csv("data/tris.csv", index=False)
+    print("CSV actualizado correctamente")
+
+if __name__ == "__main__":
+    main()
