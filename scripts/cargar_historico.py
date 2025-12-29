@@ -1,37 +1,26 @@
-import pandas as pd
+import csv
 import requests
-from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
 
-# URL de resultados históricos (no oficial, fácil de leer)
-URL = "https://www.loteriasyapuestas.mx/resultados-tris-historicos"
+URL = "https://www.pronosticos.gob.mx/Documentos/Historicos/Tris.csv"
+OUTPUT = "data/tris.csv"
 
-def cargar_historico():
-    response = requests.get(URL)
-    soup = BeautifulSoup(response.text, "html.parser")
+def main():
+    r = requests.get(URL)
+    r.raise_for_status()
 
-    filas = []
+    lines = r.text.splitlines()
 
-    tabla = soup.find("table")
-    if not tabla:
-        print("No se encontró la tabla")
-        return
+    with open(OUTPUT, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["fecha", "hora", "sorteo", "numero"])
 
-    for row in tabla.find_all("tr")[1:]:
-        cols = row.find_all("td")
-        if len(cols) < 4:
-            continue
+        for line in lines[1:]:
+            cols = line.split(",")
+            if len(cols) >= 4:
+                writer.writerow(cols[:4])
 
-        fecha = cols[0].text.strip()
-        sorteo = cols[1].text.strip()
-        hora = cols[2].text.strip()
-        numero = cols[3].text.strip().zfill(5)
-
-        filas.append([fecha, hora, sorteo, numero])
-
-    df = pd.DataFrame(filas, columns=["fecha", "hora", "sorteo", "numero"])
-
-    df.to_csv("data/tris.csv", index=False)
-    print(f"Histórico cargado: {len(df)} sorteos")
+    print("Histórico TRIS cargado correctamente")
 
 if __name__ == "__main__":
-    cargar_historico()
+    main()
