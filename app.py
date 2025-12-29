@@ -1,117 +1,173 @@
+
 import streamlit as st
 import pandas as pd
-
-st.set_page_config(page_title="TRIS Predictor", layout="wide")
-
-st.title("🎲 TRIS – Análisis y Calculadora")
-st.caption("Datos históricos automáticos")
+from collections import Counter
 
 # =====================
-# CARGAR DATOS
+# CONFIGURACIÓN
+# =====================
+st.set_page_config(
+    page_title="Pronósticos Lucky - TRIS",
+    layout="centered"
+)
+
+st.title("🎲 Pronósticos Lucky – TRIS")
+st.caption("Análisis estadístico basado en resultados reales")
+st.divider()
+
+# =====================
+# CARGA DE DATOS
 # =====================
 @st.cache_data
 def cargar_datos():
-    return pd.read_csv("data/tris.csv")
+    df = pd.read_csv("data/tris_limpio.csv")
+    df["numero"] = df["numero"].astype(str).str.zfill(5)
+    return df
 
 df = cargar_datos()
 
-st.success(f"Registros cargados: {len(df)}")
-
-# Normalizar columna
-df.columns = [c.lower() for c in df.columns]
-
-# Detectar columna de número ganador
-col_numero = None
-for c in df.columns:
-    if "combin" in c or "ganador" in c or "numero" in c:
-        col_numero = c
-        break
-
-if col_numero is None:
-    st.error("No se encontró la columna del número ganador")
-    st.stop()
-
-df["numero"] = df[col_numero].astype(str).str.zfill(5)
+st.success(f"Base cargada: {len(df)} sorteos")
 
 # =====================
-# BUSCADOR
+# FILTRO ÚLTIMOS 150
 # =====================
-st.divider()
-st.subheader("🔎 Buscar número")
+df_150 = df.tail(150)
 
-numero_usuario = st.text_input(
-    "Ingresa número (1 a 5 dígitos)",
-    max_chars=5
-)
+# =====================
+# FUNCIONES ÚTILES
+# =====================
+def tipo_jugada(numero, jugada):
+    if jugada == numero:
+        return "Directa 5"
+    if numero.endswith(jugada):
+        if len(jugada) == 2:
+            return "Par final"
+        return "Número final"
+    if numero.startswith(jugada):
+        if len(jugada) == 2:
+            return "Par inicial"
+        return "Número inicial"
+    if jugada in numero:
+        if len(jugada) == 3:
+            return "Directa 3"
+        if len(jugada) == 4:
+            return "Directa 4"
+    return "No aplica"
 
-def clasificar(numero, buscado):
-    numero = str(numero)
-    buscado = str(buscado)
+# =====================
+# 🔥 NÚMEROS CALIENTES / FRÍOS
+# =====================
+st.header("🔥❄️ Números calientes y fríos (últimos 150)")
 
-    if numero == buscado.zfill(5):
-        return "🎯 Directa exacta"
-    elif numero.startswith(buscado):
-        return "🔢 Inicial"
-    elif numero.endswith(buscado):
-        return "🔢 Final"
-    elif buscado in numero:
-        return "🧩 Parcial"
-    else:
-        return "—"
+conteo = Counter(df_150["numero"])
+
+calientes = conteo.most_common(7)
+frios = conteo.most_common()[:-8:-1]
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("🔥 Calientes")
+    st.write(calientes)
+
+with col2:
+    st.subheader("❄️ Fríos")
+    st.write(frios)
+
+# =====================
+# 🧗 ESCALERAS Y PIRÁMIDES
+# =====================
+st.header("🧗 Escaleras y pirámides recomendadas")
+
+def es_escalera(num):
+    return all(int(num[i])+1 == int(num[i+1]) for i in range(len(num)-1))
+
+def es_piramide(num):
+    return num == num[::-1]
+
+escaleras = [n for n in conteo if es_escalera(n)]
+piramides = [n for n in conteo if es_piramide(n)]
+
+st.subheader("🧗 Escaleras (top 7)")
+st.write(escaleras[:7])
+
+st.subheader("🔺 Pirámides (top 7)")
+st.write(piramides[:7])
+
+# =====================
+# 🎯 TOP 7 COMBINACIONES
+# =====================
+st.header("🎯 Top 7 combinaciones sugeridas")
+
+top7 = [n for n, _ in calientes][:5]
+top7 += escaleras[:1]
+top7 += piramides[:1]
+
+st.write(top7)
+
+# =====================
+# 🔎 CONSULTA POR NÚMERO
+# =====================
+st.header("🔎 Consulta por número")
+
+numero_usuario = st.text_input("Ingresa un número (1 a 5 cifras)")
 
 if numero_usuario:
-    resultados = df[df["numero"].str.contains(numero_usuario)].copy()
+    numero_usuario = numero_usuario.zfill(len(numero_usuario))
+    sub = df_150[df_150["numero"].str.contains(numero_usuario)]
 
-    if len(resultados) > 0:
-        resultados["Tipo de jugada"] = resultados["numero"].apply(
-            lambda x: clasificar(x, numero_usuario)
-        )
-
-        st.success(f"Coincidencias encontradas: {len(resultados)}")
-        st.dataframe(
-            resultados[["numero", "Tipo de jugada"]],
-            use_container_width=True
-        )
+    if len(sub) == 0:
+        st.warning("Este número no ha salido en los últimos 150 sorteos")
     else:
-        st.warning("No se encontraron coincidencias")
+        st.success(f"Salió {len(sub)} veces en los últimos 150 sorteos")
+
+        ultima = sub.iloc[-1]
+
+        st.write(f"📅 Última vez: {ultima['fecha']}")
+        st.write(f"🕒 Sorteo: {ultima['tipo']}")
+
+        por_sorteo = sub["tipo"].value_counts()
+        st.subheader("📊 Por sorteo")
+        st.write(por_sorteo)
 
 # =====================
-# CALCULADORA
+# 💰 CALCULADORA OFICIAL TRIS
 # =====================
-st.divider()
-st.subheader("💰 Calculadora de premios")
-
-monto = st.number_input(
-    "Monto apostado ($)",
-    min_value=1,
-    value=10,
-    step=1
-)
+st.header("💰 Simulador de apuesta oficial")
 
 tipo = st.selectbox(
     "Tipo de jugada",
     [
-        "🎯 Directa exacta",
-        "🔢 Inicial",
-        "🔢 Final",
-        "🧩 Parcial"
+        "Número inicial",
+        "Número final",
+        "Par inicial",
+        "Par final",
+        "Directa 3",
+        "Directa 4",
+        "Directa 5"
     ]
 )
 
-multiplicadores = {
-    "🎯 Directa exacta": 500,
-    "🔢 Inicial": 50,
-    "🔢 Final": 50,
-    "🧩 Parcial": 10
+apuesta = st.number_input("Monto apostado ($)", min_value=1, value=5)
+multiplicador = st.number_input("Monto al multiplicador ($)", min_value=0, value=0)
+
+pagos = {
+    "Número inicial": 5,
+    "Número final": 5,
+    "Par inicial": 50,
+    "Par final": 50,
+    "Directa 3": 500,
+    "Directa 4": 5000,
+    "Directa 5": 50000
 }
 
-ganancia = monto * multiplicadores[tipo]
+ganancia = (apuesta + multiplicador) * pagos[tipo]
 
-st.info(f"💵 Ganancia potencial: **${ganancia}**")
+st.success(f"💵 Ganancia potencial: ${ganancia:,.0f}")
+st.caption("🍀 Pronósticos Lucky te desea mucha suerte")
 
 # =====================
-# MOSTRAR HISTÓRICO
+# 📊 HISTORIAL
 # =====================
-st.divider()
-st.subheader("📊 Historial TRIS (últimos registros)")
+st.header("📊 Últimos resultados")
 st.dataframe(df.tail(20), use_container_width=True)
