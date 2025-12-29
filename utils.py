@@ -1,87 +1,68 @@
 import pandas as pd
-from collections import Counter
 
-# =========================
-# TABLAS OFICIALES DE PAGOS
-# =========================
-
-PAGOS_BASE = {
-    "Numero Inicial": 5,
-    "Numero Final": 5,
-    "Par Inicial": 50,
-    "Par Final": 50,
-    "Directa 3": 500,
-    "Directa 4": 5000,
-    "Directa 5": 50000,
-}
-
-PAGOS_MULTIPLICADOR = {
-    "Numero Inicial": 20,
-    "Numero Final": 20,
-    "Par Inicial": 200,
-    "Par Final": 200,
-    "Directa 3": 2000,
-    "Directa 4": 20000,
-    "Directa 5": 200000,
-}
-
-# =========================
-# CARGA DE DATOS
-# =========================
-
+# ---------- CARGA DE DATOS ----------
 def load_data():
-    df = pd.read_csv("data/tris.csv", dtype={"numero": str})
-    df["numero"] = df["numero"].str.zfill(5)
+    df = pd.read_csv("data/tris.csv")
+    df["fecha"] = pd.to_datetime(df["fecha"])
+    df["numero"] = df["numero"].astype(str).str.zfill(5)
     return df
 
-# =========================
-# UTILIDADES DE ANALISIS
-# =========================
 
-def extraer_numero(numero, tipo):
-    if tipo == "Numero Inicial":
-        return numero[0]
-    if tipo == "Numero Final":
-        return numero[-1]
-    if tipo == "Par Inicial":
-        return numero[:2]
-    if tipo == "Par Final":
-        return numero[-2:]
-    if tipo == "Directa 3":
-        return numero[-3:]
-    if tipo == "Directa 4":
-        return numero[-4:]
-    if tipo == "Directa 5":
-        return numero
+# ---------- ÚLTIMOS N SORTEOS ----------
+def ultimos_juegos(df, n=150):
+    return df.sort_values("fecha", ascending=False).head(n)
 
-def analizar_numero(df, numero_usuario, tipo):
-    df["comparado"] = df["numero"].apply(lambda x: extraer_numero(x, tipo))
-    sub = df[df["comparado"] == numero_usuario]
 
-    if sub.empty:
+# ---------- FRECUENCIAS ----------
+def conteo_numeros(df):
+    return df["numero"].value_counts()
+
+
+# ---------- NÚMERO FUERTE POR SORTEO ----------
+def numero_fuerte(df, sorteo):
+    d = df[df["sorteo"] == sorteo]
+    conteo = d["numero"].value_counts()
+    if conteo.empty:
+        return None, 0
+    return conteo.idxmax(), conteo.max()
+
+
+# ---------- CALIENTES Y FRÍOS ----------
+def calientes_frios(df, top=7):
+    conteo = df["numero"].value_counts()
+    calientes = conteo.head(top)
+    frios = conteo.tail(top)
+    return calientes, frios
+
+
+# ---------- CONSULTA POR NÚMERO ----------
+def consulta_numero(df, numero):
+    numero = str(numero).zfill(5)
+    d = df[df["numero"] == numero]
+
+    if d.empty:
         return None
 
     return {
-        "total": len(sub),
-        "ultima_fecha": sub.iloc[-1]["fecha"],
-        "ultima_hora": sub.iloc[-1]["hora"],
-        "ultimo_sorteo": sub.iloc[-1]["sorteo"],
-        "por_sorteo": sub["sorteo"].value_counts().to_dict()
+        "total": len(d),
+        "ultima_fecha": d["fecha"].max().date(),
+        "por_sorteo": d["sorteo"].value_counts()
     }
 
-def numeros_calientes(df, tipo, top=7):
-    df["comparado"] = df["numero"].apply(lambda x: extraer_numero(x, tipo))
-    conteo = Counter(df["comparado"])
-    calientes = conteo.most_common(top)
-    frios = conteo.most_common()[:-top-1:-1]
-    return calientes, frios
 
-# =========================
-# SIMULADOR DE APUESTAS
-# =========================
+# ---------- TABLA DE PREMIOS OFICIAL ----------
+PAGOS = {
+    "Directa 5": 50000,
+    "Directa 4": 5000,
+    "Directa 3": 500,
+    "Par Inicial": 50,
+    "Par Final": 50,
+    "Número Inicial": 5,
+    "Número Final": 5,
+}
 
-def calcular_premio(tipo, apuesta_base, apuesta_multi):
-    premio_base = apuesta_base * PAGOS_BASE[tipo]
-    premio_multi = apuesta_multi * PAGOS_MULTIPLICADOR[tipo]
-    total = premio_base + premio_multi
-    return premio_base, premio_multi, total
+
+def calcular_ganancia(tipo, monto, multiplicador):
+    premio_base = PAGOS.get(tipo, 0) * monto
+    premio_multi = multiplicador * PAGOS.get(tipo, 0) if multiplicador > 0 else 0
+    return premio_base + premio_multi
