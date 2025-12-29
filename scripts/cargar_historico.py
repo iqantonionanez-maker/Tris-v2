@@ -1,32 +1,17 @@
 import pandas as pd
 import requests
-from datetime import datetime
 
-# FUENTE PÚBLICA (no gubernamental)
-URL = "https://api.allorigins.win/raw?url=https://www.pronosticos.gob.mx/Resultados/Tris"
-
-def obtener_datos():
-    response = requests.get(URL, timeout=30)
-    response.raise_for_status()
-    data = response.json()
-    return data
-
-def procesar(data, limite=1000):
-    filas = []
-
-    for item in data[:limite]:
-        filas.append({
-            "fecha": item.get("fecha"),
-            "hora": item.get("hora"),
-            "sorteo": item.get("sorteo"),
-            "numero": str(item.get("resultado")).zfill(5)
-        })
-
-    return pd.DataFrame(filas)
+URL = "https://api.allorigins.win/raw?url=https://www.lotterycorner.com/mx/tris/results"
 
 def main():
-    data = obtener_datos()
-    df = procesar(data)
+    tablas = pd.read_html(URL)
+    df = tablas[0]
+
+    df.columns = ["fecha", "hora", "sorteo", "numero"]
+
+    df["numero"] = df["numero"].astype(str).str.zfill(5)
+
+    df = df.head(1000)
 
     df.to_csv("data/tris.csv", index=False)
     print(f"✔ {len(df)} sorteos guardados")
