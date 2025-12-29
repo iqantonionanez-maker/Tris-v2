@@ -1,36 +1,36 @@
-import requests
 import pandas as pd
-from bs4 import BeautifulSoup
-from io import StringIO
-import urllib3
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# Cargar el CSV crudo
+df = pd.read_csv("data/tris.csv", header=None)
 
-URL = "https://www.loterianacional.gob.mx/Tris/resultados"
+registros = []
 
-def main():
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-    }
+fecha = None
 
-    response = requests.get(
-        URL,
-        headers=headers,
-        timeout=30,
-        verify=False
-    )
-    response.raise_for_status()
+for i in range(len(df)):
+    fila = df.iloc[i].astype(str).tolist()
 
-    soup = BeautifulSoup(response.text, "html.parser")
-    table = soup.find("table")
+    if "Fecha" in fila[0]:
+        fecha = fila[0].replace("Fecha", "").strip()
+        continue
 
-    if table is None:
-        raise Exception("No se encontró la tabla")
+    if fila[0].isdigit() and len(fila[0]) >= 4:
+        sorteo = fila[0]
+        tipo = fila[1]
+        numero = fila[2]
 
-    df = pd.read_html(StringIO(str(table)))[0]
-    df.to_csv("data/tris.csv", index=False)
+        registros.append({
+            "fecha": fecha,
+            "sorteo": sorteo,
+            "tipo": tipo,
+            "numero": numero
+        })
 
-    print("CSV actualizado correctamente")
+# DataFrame limpio
+df_limpio = pd.DataFrame(registros)
 
-if __name__ == "__main__":
-    main()
+# Guardar CSV limpio
+df_limpio.to_csv("data/tris_limpio.csv", index=False)
+
+print("✅ CSV limpio generado correctamente")
+print(df_limpio.head())
